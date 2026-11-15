@@ -104,6 +104,23 @@ import { registerListLdapMapperTypes } from "@/tools/list-ldap-mapper-types.js";
 import { registerListLdapMappers } from "@/tools/list-ldap-mappers.js";
 import { registerCreateLdapMapper } from "@/tools/create-ldap-mapper.js";
 import { registerDeleteLdapMapper } from "@/tools/delete-ldap-mapper.js";
+import { registerGetAuthorizationSettings } from "@/tools/get-authorization-settings.js";
+import { registerUpdateAuthorizationSettings } from "@/tools/update-authorization-settings.js";
+import { registerExportAuthorizationSettings } from "@/tools/export-authorization-settings.js";
+import { registerEvaluateAuthorization } from "@/tools/evaluate-authorization.js";
+import { registerListAuthorizationScopes } from "@/tools/list-authorization-scopes.js";
+import { registerCreateAuthorizationScope } from "@/tools/create-authorization-scope.js";
+import { registerDeleteAuthorizationScope } from "@/tools/delete-authorization-scope.js";
+import { registerListAuthorizationResources } from "@/tools/list-authorization-resources.js";
+import { registerCreateAuthorizationResource } from "@/tools/create-authorization-resource.js";
+import { registerUpdateAuthorizationResource } from "@/tools/update-authorization-resource.js";
+import { registerDeleteAuthorizationResource } from "@/tools/delete-authorization-resource.js";
+import { registerListAuthorizationPolicies } from "@/tools/list-authorization-policies.js";
+import { registerCreateAuthorizationPolicy } from "@/tools/create-authorization-policy.js";
+import { registerDeleteAuthorizationPolicy } from "@/tools/delete-authorization-policy.js";
+import { registerListAuthorizationPermissions } from "@/tools/list-authorization-permissions.js";
+import { registerCreateAuthorizationPermission } from "@/tools/create-authorization-permission.js";
+import { registerDeleteAuthorizationPermission } from "@/tools/delete-authorization-permission.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
 
 type Register = (server: McpServer) => void;
@@ -221,6 +238,25 @@ export const TOOL_GROUPS = {
     registerSetRealmFlowBinding,
     registerListRequiredActions,
     registerUpdateRequiredAction
+  ],
+  authorization: [
+    registerGetAuthorizationSettings,
+    registerUpdateAuthorizationSettings,
+    registerExportAuthorizationSettings,
+    registerEvaluateAuthorization,
+    registerListAuthorizationScopes,
+    registerCreateAuthorizationScope,
+    registerDeleteAuthorizationScope,
+    registerListAuthorizationResources,
+    registerCreateAuthorizationResource,
+    registerUpdateAuthorizationResource,
+    registerDeleteAuthorizationResource,
+    registerListAuthorizationPolicies,
+    registerCreateAuthorizationPolicy,
+    registerDeleteAuthorizationPolicy,
+    registerListAuthorizationPermissions,
+    registerCreateAuthorizationPermission,
+    registerDeleteAuthorizationPermission
   ],
   federation: [
     registerListUserFederationProviders,

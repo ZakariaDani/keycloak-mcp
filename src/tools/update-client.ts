@@ -24,6 +24,13 @@ export function registerUpdateClient(server: McpServer) {
           .boolean()
           .optional()
           .describe("Enable the service account (client_credentials) flow"),
+        authorizationServicesEnabled: z
+          .boolean()
+          .optional()
+          .describe(
+            "Turn authorization services (fine-grained resource permissions) on or off. Needs a " +
+              "confidential client; once on, manage it with the authorization-* tools. Turning it off may delete its resources, policies and permissions"
+          ),
         redirectUris: z.array(z.string()).optional().describe("Replacement list of valid redirect URIs"),
         webOrigins: z.array(z.string()).optional().describe("Replacement list of allowed CORS origins")
       }

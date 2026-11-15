@@ -6,7 +6,8 @@ and is launched by an MCP client (Claude Desktop, Claude Code, the MCP Inspector
 
 It covers day-to-day administration across users, roles (including composite roles), groups,
 clients, client scopes and protocol mappers, realms and realm settings, identity providers,
-authentication flows, LDAP/AD user federation and events: over 100 tools in 10 groups. Load only
+authentication flows, authorization services, LDAP/AD user federation and events: over 100
+tools in 11 groups. Load only
 the groups you need with the [`KEYCLOAK_TOOLS`](#tool-groups) environment variable.
 
 Built on [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk)
@@ -94,6 +95,7 @@ stops the server at startup with a message listing the valid groups.
 | `realms`             | Realm create/delete/enable, settings, SMTP, event-storage config.                             |
 | `identity-providers` | Identity providers and their mappers.                                                         |
 | `authentication`     | Authentication flows, flow bindings and required actions.                                     |
+| `authorization`      | Authorization services: resources, scopes, policies, permissions, evaluation.                 |
 | `federation`         | LDAP/AD user federation: providers, sync, mappers.                                            |
 | `events`             | Login events and admin events.                                                                |
 
@@ -136,6 +138,9 @@ claude mcp add keycloak -e KEYCLOAK_TOOLS=users,roles -- <command...>
    - The authentication-flow and required-action tools need `view-realm` (read) or
      `manage-realm` (create/copy/delete/edit flows, `set-realm-flow-binding`,
      `update-required-action`).
+   - The authorization tools need `view-authorization` (read, `evaluate-authorization`,
+     `export-authorization-settings`) or `manage-authorization` (create/update/delete), plus
+     `view-users` / `view-clients` where a policy names users or clients.
    - The user-federation tools need `view-realm` (read) or `manage-realm` (create, update,
      delete, sync, unlink, mappers). `unlink-federated-users` and
      `remove-imported-federated-users` also touch users, so grant `manage-users` too.
@@ -330,7 +335,7 @@ checked before anything is written, so a typo changes nothing.
 | `get-client`         | Get one client by clientId (protocol, flow settings, redirect URIs, web origins). No secret.            | `realm`, `clientId` |
 | `get-client-secret`  | Retrieve a confidential client's current secret. **Sensitive** — non-public clients only.               | `realm`, `clientId` |
 | `create-client`             | Register a new client. Defaults to confidential standard-flow; toggle public / service-account.   | `realm`, `clientId`, `name?`, `description?`, `publicClient?` (def. false), `standardFlowEnabled?` (def. true), `serviceAccountsEnabled?` (def. false), `redirectUris?`, `webOrigins?` |
-| `update-client`             | Update an existing client. Only supplied fields change; `redirectUris` / `webOrigins` **replace** the existing lists. Needs ≥1 field. | `realm`, `clientId`, `name?`, `description?`, `enabled?`, `publicClient?`, `standardFlowEnabled?`, `serviceAccountsEnabled?`, `redirectUris?`, `webOrigins?` |
+| `update-client`             | Update an existing client. Only supplied fields change; `redirectUris` / `webOrigins` **replace** the existing lists. Needs ≥1 field. | `realm`, `clientId`, `name?`, `description?`, `enabled?`, `publicClient?`, `standardFlowEnabled?`, `serviceAccountsEnabled?`, `authorizationServicesEnabled?`, `redirectUris?`, `webOrigins?` |
 | `delete-client`             | Delete a client, including its roles, secret and service account. **Irreversible.**               | `realm`, `clientId` |
 | `regenerate-client-secret`  | Rotate a confidential client's secret and return the new value. **Sensitive**; old secret dies.   | `realm`, `clientId` |
 | `get-client-service-account` | Get the service-account user behind a client (id, username, enabled). Needs `serviceAccountsEnabled`. | `realm`, `clientId` |
@@ -418,6 +423,37 @@ provider's first-broker-login flow (set on the identity provider) are not covere
 | `list-required-actions`  | List required actions (`VERIFY_EMAIL`, `CONFIGURE_TOTP`, ...): enabled, default flag and priority.             | `realm` |
 | `update-required-action` | Enable/disable an action, rename it, or make it a *default* action assigned to every **new** user. Needs ≥1 field. | `realm`, `alias`, `enabled?`, `defaultAction?`, `name?` |
 
+### Authorization services (`authorization`, 17 tools)
+
+Authorization services add fine-grained access control to a client (the *resource server*). All
+tools take the resource server's `clientId`, and everything is referenced by **name**. The model:
+*resources* (what is protected) carry *scopes* (actions such as view/edit); *policies* say who or when
+(role, user, group, time...); a *permission* ties resources/scopes to the policies that must be
+satisfied. Build them in that order, then check the outcome with `evaluate-authorization`. Enable the
+feature first with `update-client` (`authorizationServicesEnabled=true`, confidential clients only).
+Editing an existing policy or permission, and importing a full settings JSON, are not covered: delete
+and re-create. `export-authorization-settings` shows the full picture, including policy members.
+
+| Tool | Description | Arguments |
+| ---- | ----------- | --------- |
+| `get-authorization-settings` | Get a resource server's settings: enforcement mode, decision strategy, remote resource management. | `realm`, `clientId` |
+| `update-authorization-settings` | Change enforcement mode (`ENFORCING`/`PERMISSIVE`/`DISABLED`), decision strategy or remote management. `DISABLED` turns authorization off for the whole resource server. Needs ≥1 field. | `realm`, `clientId`, `policyEnforcementMode?`, `decisionStrategy?`, `allowRemoteResourceManagement?` |
+| `export-authorization-settings` | Export the full authorization config (settings, scopes, resources, policies, permissions) as JSON, members by name. Can be large. | `realm`, `clientId` |
+| `evaluate-authorization` | Dry-run: would a user be permitted to access a resource/scopes, and which policies decided it? Changes nothing. | `realm`, `clientId`, `username`, `resource?`, `scopes?[]`, `attributes?` |
+| `list-authorization-scopes` | List the resource server's authorization scopes (actions such as `view`, `edit`). Not OAuth client scopes. | `realm`, `clientId`, `name?`, `first?`, `max?` |
+| `create-authorization-scope` | Create an authorization scope. Fails if the name exists. | `realm`, `clientId`, `name`, `displayName?` |
+| `delete-authorization-scope` | Delete a scope; it is removed from every resource and scope permission using it. **Irreversible.** | `realm`, `clientId`, `name` |
+| `list-authorization-resources` | List protected resources with type, URIs and attached scopes. Filterable; paginated. | `realm`, `clientId`, `name?`, `type?`, `uri?`, `owner?`, `first?`, `max?` |
+| `create-authorization-resource` | Create a protected resource. Scopes are given by name and must already exist. Fails if the name exists. | `realm`, `clientId`, `name`, `displayName?`, `type?`, `uris?[]`, `scopes?[]`, `ownerManagedAccess?` (def. false) |
+| `update-authorization-resource` | Update a resource by name. `uris` and `scopes` **replace** the existing lists. Needs ≥1 field. | `realm`, `clientId`, `name`, `displayName?`, `type?`, `uris?[]`, `scopes?[]`, `ownerManagedAccess?` |
+| `delete-authorization-resource` | Delete a protected resource. **Irreversible.** | `realm`, `clientId`, `name` |
+| `list-authorization-policies` | List policies (name, type, logic, decision strategy). Use `export-authorization-settings` to see members. | `realm`, `clientId`, `name?`, `type?`, `first?`, `max?` |
+| `create-authorization-policy` | Create a policy of type `role`, `user`, `group`, `client`, `aggregate`, `time` or `regex`. Members are given by name; `logic: NEGATIVE` inverts it. Grants nothing until a permission uses it. | `realm`, `clientId`, `name`, `type`, `description?`, `logic?`, `decisionStrategy?`, `roles?[]`, `users?[]`, `groups?[]`, `extendChildren?`, `clients?[]`, `policies?[]`, `settings?` |
+| `delete-authorization-policy` | Delete a policy; permissions that used it lose it, which can silently widen or narrow access. **Irreversible.** | `realm`, `clientId`, `name` |
+| `list-authorization-permissions` | List permissions (name, type, decision strategy); `details=true` adds the linked resources, scopes and policies. | `realm`, `clientId`, `name?`, `resource?`, `details?`, `first?`, `max?` |
+| `create-authorization-permission` | Grant access: tie resources (or a `resourceType`) and/or scopes to the policies that must be met. `type`: `resource` or `scope`. Everything by name and must exist. | `realm`, `clientId`, `name`, `type`, `description?`, `resources?[]`, `resourceType?`, `scopes?[]`, `policies[]`, `decisionStrategy?` |
+| `delete-authorization-permission` | Delete a permission; the resources and policies it linked are kept. **Irreversible.** | `realm`, `clientId`, `name` |
+
 ### User federation (LDAP / Active Directory) (`federation`, 12 tools)
 
 Federation providers let Keycloak authenticate users against an external directory. Providers and
@@ -473,6 +509,8 @@ Once integrated, you can prompt Claude in natural language, for example:
 - “Add a `department` claim mapper to the `my-backend` client.”
 - “Make `billing-admin` a composite role that includes `offline_access`.”
 - “Copy the `browser` flow to `browser-with-otp`, make OTP required, then bind it to the realm.”
+- “Why can't `jdoe` view the `invoices` resource of `my-backend`?” (authorization evaluation)
+- “Let the `finance` group view and edit `invoices` in `my-backend`.”
 - “Connect `financement-realm` to our Active Directory at `ldaps://ad.example.com` and sync the users.”
 
 Claude will pick the matching tool and fill in the arguments.
@@ -503,5 +541,7 @@ Claude will pick the matching tool and fill in the arguments.
 | Server exits at startup with `Unknown KEYCLOAK_TOOLS group(s)` | A name in `KEYCLOAK_TOOLS` is misspelled. The message lists the valid groups; see [Tool groups](#tool-groups). |
 | A tool is missing from the client | Its group is not enabled. Check the startup line on stderr (`N tools registered (groups: ...)`) and add the group to `KEYCLOAK_TOOLS`. |
 | `list-events` / `list-admin-events` return `[]` | Event storage is off for that realm. Enable it with `update-realm-events-config`. |
+| `Authorization services are not enabled on client ...` | Enable them with `update-client` (`authorizationServicesEnabled=true`); the client must be confidential (not public). |
+| `create-authorization-*` says a scope/resource/policy `not found` | They are referenced by name and must exist first. Create in order: scopes, resources, policies, then the permission. |
 | LDAP sync reports `failed` users or nothing is imported | Check `connectionUrl`, `usersDn` and the bind credentials with `get-user-federation-provider`; `list-ldap-mappers` shows how attributes are mapped. |
 | Changes not visible in Claude Desktop | Fully restart the app after editing the config. |
