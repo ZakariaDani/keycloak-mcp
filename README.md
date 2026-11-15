@@ -6,8 +6,8 @@ and is launched by an MCP client (Claude Desktop, Claude Code, the MCP Inspector
 
 It covers day-to-day administration across users, roles (including composite roles), groups,
 clients, client scopes and protocol mappers, realms and realm settings, identity providers,
-authentication flows, authorization services, LDAP/AD user federation and events: over 100
-tools in 11 groups. Load only
+authentication flows, authorization services, organizations, LDAP/AD user federation and
+events: over 100 tools in 12 groups. Load only
 the groups you need with the [`KEYCLOAK_TOOLS`](#tool-groups) environment variable.
 
 Built on [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk)
@@ -96,6 +96,7 @@ stops the server at startup with a message listing the valid groups.
 | `identity-providers` | Identity providers and their mappers.                                                         |
 | `authentication`     | Authentication flows, flow bindings and required actions.                                     |
 | `authorization`      | Authorization services: resources, scopes, policies, permissions, evaluation.                 |
+| `organizations`      | Organizations (B2B tenants): members, invitations, linked identity providers.                 |
 | `federation`         | LDAP/AD user federation: providers, sync, mappers.                                            |
 | `events`             | Login events and admin events.                                                                |
 
@@ -141,6 +142,9 @@ claude mcp add keycloak -e KEYCLOAK_TOOLS=users,roles -- <command...>
    - The authorization tools need `view-authorization` (read, `evaluate-authorization`,
      `export-authorization-settings`) or `manage-authorization` (create/update/delete), plus
      `view-users` / `view-clients` where a policy names users or clients.
+   - The organization tools need `view-realm` (read) or `manage-realm` (create/update/delete,
+     members, invitations, identity-provider links), plus `manage-users` to add or remove members.
+     They only work once `organizationsEnabled` is on for the realm.
    - The user-federation tools need `view-realm` (read) or `manage-realm` (create, update,
      delete, sync, unlink, mappers). `unlink-federated-users` and
      `remove-imported-federated-users` also touch users, so grant `manage-users` too.
@@ -374,7 +378,7 @@ Turn on event storage with `update-realm-events-config` before `list-events` /
 | `get-realm`   | Get a realm's key settings: enabled, login flags, token/session lifespans, SMTP-configured.  | `realm` |
 | `set-realm-enabled`  | Enable or disable a realm. Disabling blocks **all** logins to it immediately.        | `realm`, `enabled` |
 | `create-realm`       | Create a new, empty realm with Keycloak defaults. Fails if the name exists.          | `realm`, `displayName?`, `enabled?` (def. true) |
-| `update-realm-settings` | Update login options, security (`sslRequired`, brute force, `passwordPolicy`), token/session lifespans (seconds), locale and theme. Only supplied fields change; needs ≥1. | `realm`, `displayName?`, `registrationAllowed?`, `registrationEmailAsUsername?`, `loginWithEmailAllowed?`, `duplicateEmailsAllowed?`, `resetPasswordAllowed?`, `rememberMe?`, `verifyEmail?`, `editUsernameAllowed?`, `sslRequired?`, `bruteForceProtected?`, `failureFactor?`, `passwordPolicy?`, `accessTokenLifespan?`, `ssoSessionIdleTimeout?`, `ssoSessionMaxLifespan?`, `internationalizationEnabled?`, `defaultLocale?`, `supportedLocales?`, `loginTheme?` |
+| `update-realm-settings` | Update login options, security (`sslRequired`, brute force, `passwordPolicy`), token/session lifespans (seconds), locale and theme. Only supplied fields change; needs ≥1. | `realm`, `displayName?`, `registrationAllowed?`, `registrationEmailAsUsername?`, `loginWithEmailAllowed?`, `duplicateEmailsAllowed?`, `resetPasswordAllowed?`, `rememberMe?`, `verifyEmail?`, `editUsernameAllowed?`, `sslRequired?`, `bruteForceProtected?`, `failureFactor?`, `passwordPolicy?`, `accessTokenLifespan?`, `ssoSessionIdleTimeout?`, `ssoSessionMaxLifespan?`, `internationalizationEnabled?`, `defaultLocale?`, `supportedLocales?`, `organizationsEnabled?`, `loginTheme?` |
 | `get-realm-smtp`     | Read a realm's SMTP settings. The password is never returned, only `passwordSet`.    | `realm` |
 | `update-realm-smtp`  | Configure outgoing email. Only supplied fields change; existing SMTP config is kept. Password is write-only. | `realm`, `host?`, `port?`, `from?`, `fromDisplayName?`, `replyTo?`, `auth?`, `user?`, `password?`, `ssl?`, `starttls?` |
 | `update-realm-events-config` | Turn user-event and admin-event storage on/off (required before `list-events` / `list-admin-events` return data). | `realm`, `eventsEnabled?`, `eventsExpiration?` (seconds), `adminEventsEnabled?`, `adminEventsDetailsEnabled?` |
@@ -454,6 +458,32 @@ and re-create. `export-authorization-settings` shows the full picture, including
 | `create-authorization-permission` | Grant access: tie resources (or a `resourceType`) and/or scopes to the policies that must be met. `type`: `resource` or `scope`. Everything by name and must exist. | `realm`, `clientId`, `name`, `type`, `description?`, `resources?[]`, `resourceType?`, `scopes?[]`, `policies[]`, `decisionStrategy?` |
 | `delete-authorization-permission` | Delete a permission; the resources and policies it linked are kept. **Irreversible.** | `realm`, `clientId`, `name` |
 
+### Organizations (`organizations`, 15 tools)
+
+Organizations group users into customers/tenants (Keycloak 26+), each with its own email domains and
+optionally its own identity providers. Turn the feature on first with `update-realm-settings`
+(`organizationsEnabled=true`). Organizations are addressed by **name or alias**, members by
+**username**, invitations by the invited **email**. Organization groups and per-organization
+identity-provider domain settings are not covered yet.
+
+| Tool | Description | Arguments |
+| ---- | ----------- | --------- |
+| `list-organizations` | List organizations (name, alias, enabled, email domains). `search` matches name or domain. | `realm`, `search?`, `first?`, `max?` |
+| `get-organization` | Get one organization by name or alias: description, redirect URL, domains, attributes and linked identity providers. | `realm`, `organization` |
+| `create-organization` | Create an organization. `alias` defaults to the name. Fails if the name or alias exists. | `realm`, `name`, `alias?`, `description?`, `domains?[]`, `redirectUrl?`, `enabled?` (def. true), `attributes?` |
+| `update-organization` | Update an organization. Only supplied fields change; `domains` **replace** the list, `attributes` are **merged**. Needs ≥1 field. | `realm`, `organization`, `newName?`, `alias?`, `description?`, `redirectUrl?`, `enabled?`, `domains?[]`, `attributes?` |
+| `delete-organization` | Delete an organization with its memberships, invitations and IdP links. Users it manages may be deleted too. **Irreversible.** | `realm`, `organization` |
+| `list-organization-members` | List members with their membership type (`MANAGED` = created through the organization, `UNMANAGED` = existing user who joined). | `realm`, `organization`, `search?`, `membershipType?`, `first?`, `max?` |
+| `add-organization-member` | Add an existing user (by username) as an unmanaged member. Fails if already a member. | `realm`, `organization`, `username` |
+| `remove-organization-member` | Remove a member. A managed member may be deleted with the membership. | `realm`, `organization`, `username` |
+| `list-user-organizations` | List the organizations a user belongs to. | `realm`, `username` |
+| `invite-organization-user` | Email an invitation. Existing users (matched by email) are invited as existing users; others can register. Needs SMTP. | `realm`, `organization`, `email`, `firstName?`, `lastName?` |
+| `list-organization-invitations` | List invitations: email, name, status (`PENDING`/`EXPIRED`), sent and expiry times. Links are not returned. | `realm`, `organization`, `status?`, `email?`, `first?`, `max?` |
+| `resend-organization-invitation` | Send an invitation again (identified by email). Needs SMTP. | `realm`, `organization`, `email` |
+| `delete-organization-invitation` | Cancel an invitation (identified by email). **Irreversible.** | `realm`, `organization`, `email` |
+| `link-organization-identity-provider` | Link an existing identity provider to an organization. A provider can belong to only one organization. | `realm`, `organization`, `alias` |
+| `unlink-organization-identity-provider` | Detach an identity provider from an organization; the provider itself is kept. | `realm`, `organization`, `alias` |
+
 ### User federation (LDAP / Active Directory) (`federation`, 12 tools)
 
 Federation providers let Keycloak authenticate users against an external directory. Providers and
@@ -511,6 +541,7 @@ Once integrated, you can prompt Claude in natural language, for example:
 - “Copy the `browser` flow to `browser-with-otp`, make OTP required, then bind it to the realm.”
 - “Why can't `jdoe` view the `invoices` resource of `my-backend`?” (authorization evaluation)
 - “Let the `finance` group view and edit `invoices` in `my-backend`.”
+- “Create an organization `Acme` with the domain `acme.com`, then invite `anna@acme.com` to it.”
 - “Connect `financement-realm` to our Active Directory at `ldaps://ad.example.com` and sync the users.”
 
 Claude will pick the matching tool and fill in the arguments.
@@ -543,5 +574,7 @@ Claude will pick the matching tool and fill in the arguments.
 | `list-events` / `list-admin-events` return `[]` | Event storage is off for that realm. Enable it with `update-realm-events-config`. |
 | `Authorization services are not enabled on client ...` | Enable them with `update-client` (`authorizationServicesEnabled=true`); the client must be confidential (not public). |
 | `create-authorization-*` says a scope/resource/policy `not found` | They are referenced by name and must exist first. Create in order: scopes, resources, policies, then the permission. |
+| `Organizations are not enabled in realm ...` | Turn the feature on with `update-realm-settings` (`organizationsEnabled=true`). |
+| `invite-organization-user` fails | The realm has no SMTP server configured; see `update-realm-smtp`. |
 | LDAP sync reports `failed` users or nothing is imported | Check `connectionUrl`, `usersDn` and the bind credentials with `get-user-federation-provider`; `list-ldap-mappers` shows how attributes are mapped. |
 | Changes not visible in Claude Desktop | Fully restart the app after editing the config. |

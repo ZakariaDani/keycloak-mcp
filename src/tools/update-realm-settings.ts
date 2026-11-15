@@ -40,6 +40,10 @@ export function registerUpdateRealmSettings(server: McpServer) {
         internationalizationEnabled: z.boolean().optional().describe("Enable multiple languages"),
         defaultLocale: z.string().optional().describe("Default locale, e.g. en or fr"),
         supportedLocales: z.array(z.string()).optional().describe("Supported locales, e.g. [\"en\", \"fr\"]"),
+        organizationsEnabled: z
+          .boolean()
+          .optional()
+          .describe("Turn the Organizations feature on or off (needed before the organization tools work)"),
         loginTheme: z.string().optional().describe("Login theme name, e.g. keycloak")
       }
     },

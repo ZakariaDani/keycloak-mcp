@@ -3,11 +3,8 @@ import type PolicyRepresentation from "@keycloak/keycloak-admin-client/lib/defs/
 import type ResourceRepresentation from "@keycloak/keycloak-admin-client/lib/defs/resourceRepresentation.js";
 import type ScopeRepresentation from "@keycloak/keycloak-admin-client/lib/defs/scopeRepresentation.js";
 
-/** A tool result reporting a problem the caller can act on. */
-export const fail = (text: string) => ({
-  content: [{ type: "text" as const, text }],
-  isError: true
-});
+// Re-exported so the authorization tools keep importing it from here.
+export { fail } from "@/tools/result.js";
 
 /**
  * Authorization services hang off a client (the "resource server"). Resolve it from its

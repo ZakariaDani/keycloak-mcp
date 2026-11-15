@@ -121,6 +121,21 @@ import { registerDeleteAuthorizationPolicy } from "@/tools/delete-authorization-
 import { registerListAuthorizationPermissions } from "@/tools/list-authorization-permissions.js";
 import { registerCreateAuthorizationPermission } from "@/tools/create-authorization-permission.js";
 import { registerDeleteAuthorizationPermission } from "@/tools/delete-authorization-permission.js";
+import { registerListOrganizations } from "@/tools/list-organizations.js";
+import { registerGetOrganization } from "@/tools/get-organization.js";
+import { registerCreateOrganization } from "@/tools/create-organization.js";
+import { registerUpdateOrganization } from "@/tools/update-organization.js";
+import { registerDeleteOrganization } from "@/tools/delete-organization.js";
+import { registerListOrganizationMembers } from "@/tools/list-organization-members.js";
+import { registerAddOrganizationMember } from "@/tools/add-organization-member.js";
+import { registerRemoveOrganizationMember } from "@/tools/remove-organization-member.js";
+import { registerListUserOrganizations } from "@/tools/list-user-organizations.js";
+import { registerInviteOrganizationUser } from "@/tools/invite-organization-user.js";
+import { registerListOrganizationInvitations } from "@/tools/list-organization-invitations.js";
+import { registerResendOrganizationInvitation } from "@/tools/resend-organization-invitation.js";
+import { registerDeleteOrganizationInvitation } from "@/tools/delete-organization-invitation.js";
+import { registerLinkOrganizationIdentityProvider } from "@/tools/link-organization-identity-provider.js";
+import { registerUnlinkOrganizationIdentityProvider } from "@/tools/unlink-organization-identity-provider.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
 
 type Register = (server: McpServer) => void;
@@ -257,6 +272,23 @@ export const TOOL_GROUPS = {
     registerListAuthorizationPermissions,
     registerCreateAuthorizationPermission,
     registerDeleteAuthorizationPermission
+  ],
+  organizations: [
+    registerListOrganizations,
+    registerGetOrganization,
+    registerCreateOrganization,
+    registerUpdateOrganization,
+    registerDeleteOrganization,
+    registerListOrganizationMembers,
+    registerAddOrganizationMember,
+    registerRemoveOrganizationMember,
+    registerListUserOrganizations,
+    registerInviteOrganizationUser,
+    registerListOrganizationInvitations,
+    registerResendOrganizationInvitation,
+    registerDeleteOrganizationInvitation,
+    registerLinkOrganizationIdentityProvider,
+    registerUnlinkOrganizationIdentityProvider
   ],
   federation: [
     registerListUserFederationProviders,

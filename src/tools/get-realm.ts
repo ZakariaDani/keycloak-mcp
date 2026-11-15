@@ -50,6 +50,7 @@ export function registerGetRealm(server: McpServer) {
         internationalizationEnabled: found.internationalizationEnabled ?? false,
         defaultLocale: found.defaultLocale ?? null,
         loginTheme: found.loginTheme ?? null,
+        organizationsEnabled: found.organizationsEnabled ?? false,
         eventsEnabled: found.eventsEnabled ?? false,
         adminEventsEnabled: found.adminEventsEnabled ?? false,
         smtpConfigured: Boolean(found.smtpServer && Object.keys(found.smtpServer).length > 0)
