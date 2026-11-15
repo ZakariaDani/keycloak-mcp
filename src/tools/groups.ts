@@ -136,6 +136,9 @@ import { registerResendOrganizationInvitation } from "@/tools/resend-organizatio
 import { registerDeleteOrganizationInvitation } from "@/tools/delete-organization-invitation.js";
 import { registerLinkOrganizationIdentityProvider } from "@/tools/link-organization-identity-provider.js";
 import { registerUnlinkOrganizationIdentityProvider } from "@/tools/unlink-organization-identity-provider.js";
+import { registerExportRealm } from "@/tools/export-realm.js";
+import { registerPartialImportRealm } from "@/tools/partial-import-realm.js";
+import { registerImportRealm } from "@/tools/import-realm.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
 
 type Register = (server: McpServer) => void;
@@ -289,6 +292,11 @@ export const TOOL_GROUPS = {
     registerDeleteOrganizationInvitation,
     registerLinkOrganizationIdentityProvider,
     registerUnlinkOrganizationIdentityProvider
+  ],
+  "import-export": [
+    registerExportRealm,
+    registerPartialImportRealm,
+    registerImportRealm
   ],
   federation: [
     registerListUserFederationProviders,

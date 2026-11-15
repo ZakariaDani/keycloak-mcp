@@ -6,8 +6,8 @@ and is launched by an MCP client (Claude Desktop, Claude Code, the MCP Inspector
 
 It covers day-to-day administration across users, roles (including composite roles), groups,
 clients, client scopes and protocol mappers, realms and realm settings, identity providers,
-authentication flows, authorization services, organizations, LDAP/AD user federation and
-events: over 100 tools in 12 groups. Load only
+authentication flows, authorization services, organizations, LDAP/AD user federation, events
+and realm import/export: over 100 tools in 13 groups. Load only
 the groups you need with the [`KEYCLOAK_TOOLS`](#tool-groups) environment variable.
 
 Built on [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk)
@@ -66,6 +66,7 @@ Loaded from a `.env` file at the project root.
 | `KEYCLOAK_REALM`         | no       | `master`                  | Realm used for **admin authentication** (where the service-account client lives). Not the target realm of operations. |
 | `KEYCLOAK_CLIENT_ID`     | **yes**  | —                         | The confidential client's `clientId` used for the client_credentials grant.                  |
 | `KEYCLOAK_CLIENT_SECRET` | **yes**  | —                         | The service account client secret. **Keep this out of version control.**                     |
+| `KEYCLOAK_FILES_DIR`     | no       | any location              | Directory the realm import/export tools may read from and write to. When set, any other path is refused (symlinks are resolved first). Recommended. |
 | `KEYCLOAK_TOOLS`         | no       | all groups                | Comma-separated [tool groups](#tool-groups) to expose, e.g. `users,roles`. See below.         |
 
 Example `.env`:
@@ -97,6 +98,7 @@ stops the server at startup with a message listing the valid groups.
 | `authentication`     | Authentication flows, flow bindings and required actions.                                     |
 | `authorization`      | Authorization services: resources, scopes, policies, permissions, evaluation.                 |
 | `organizations`      | Organizations (B2B tenants): members, invitations, linked identity providers.                 |
+| `import-export`      | Realm export to JSON, and import into an existing or new realm.                               |
 | `federation`         | LDAP/AD user federation: providers, sync, mappers.                                            |
 | `events`             | Login events and admin events.                                                                |
 
@@ -142,6 +144,10 @@ claude mcp add keycloak -e KEYCLOAK_TOOLS=users,roles -- <command...>
    - The authorization tools need `view-authorization` (read, `evaluate-authorization`,
      `export-authorization-settings`) or `manage-authorization` (create/update/delete), plus
      `view-users` / `view-clients` where a policy names users or clients.
+   - `export-realm` needs `view-realm` (plus `view-clients` / `view-users`-level access for what it
+     includes). `partial-import-realm` needs the manage roles of the types it imports
+     (`manage-users`, `manage-clients`, `manage-realm`), and `import-realm` needs the global
+     `create-realm` role, so the service account must authenticate in the master realm.
    - The organization tools need `view-realm` (read) or `manage-realm` (create/update/delete,
      members, invitations, identity-provider links), plus `manage-users` to add or remove members.
      They only work once `organizationsEnabled` is on for the realm.
@@ -484,6 +490,22 @@ identity-provider domain settings are not covered yet.
 | `link-organization-identity-provider` | Link an existing identity provider to an organization. A provider can belong to only one organization. | `realm`, `organization`, `alias` |
 | `unlink-organization-identity-provider` | Detach an identity provider from an organization; the provider itself is kept. | `realm`, `organization`, `alias` |
 
+### Realm import and export (`import-export`, 3 tools)
+
+Back up a realm or copy its setup to another. `export-realm` writes realm configuration as JSON;
+`partial-import-realm` loads resources into an existing realm and `import-realm` creates a new one.
+A file is given as an **absolute path ending in `.json`**; set `KEYCLOAK_FILES_DIR` to confine every
+read and write to one directory (see [Environment variables](#environment-variables)). Exports do
+**not** contain users, and Keycloak masks secrets (`**********`) in them, so after an import the
+secrets of clients, identity providers, SMTP and LDAP must be set again. Large exports should go to
+a file rather than into the conversation.
+
+| Tool | Description | Arguments |
+| ---- | ----------- | --------- |
+| `export-realm` | Export a realm as JSON: settings, flows, identity providers and optionally clients, groups and roles. Users are **not** included; secrets come back masked. `outputFile` saves it to disk (owner-readable only) and returns just a summary. | `realm`, `exportClients?` (def. true), `exportGroupsAndRoles?` (def. true), `outputFile?`, `overwrite?` (def. false) |
+| `partial-import-realm` | Import users, clients, groups, roles and identity providers from a realm JSON into an **existing** realm. `ifResourceExists`: `FAIL` (default), `SKIP` or `OVERWRITE`. Masked secrets are dropped, not stored. | `realm`, `file?` or `data?`, `ifResourceExists?`, `include?[]` |
+| `import-realm` | Create a **new** realm from a full realm JSON. `realmName` clones it under another name. Refuses existing realms and `master`; masked secrets are dropped. | `file?` or `data?`, `realmName?` |
+
 ### User federation (LDAP / Active Directory) (`federation`, 12 tools)
 
 Federation providers let Keycloak authenticate users against an external directory. Providers and
@@ -541,6 +563,8 @@ Once integrated, you can prompt Claude in natural language, for example:
 - “Copy the `browser` flow to `browser-with-otp`, make OTP required, then bind it to the realm.”
 - “Why can't `jdoe` view the `invoices` resource of `my-backend`?” (authorization evaluation)
 - “Let the `finance` group view and edit `invoices` in `my-backend`.”
+- “Export `financement-realm` to `/Users/me/backups/financement.json`.”
+- “Clone `financement-realm` as `staging-realm` from that file.”
 - “Create an organization `Acme` with the domain `acme.com`, then invite `anna@acme.com` to it.”
 - “Connect `financement-realm` to our Active Directory at `ldaps://ad.example.com` and sync the users.”
 
@@ -548,7 +572,8 @@ Claude will pick the matching tool and fill in the arguments.
 
 > ⚠️ **Destructive tools have no confirmation step.** Every `delete-*` tool,
 > `remove-imported-federated-users`, `unlink-federated-users`, `logout-user`,
-> `regenerate-client-secret`, `set-realm-enabled(false)` and `set-realm-flow-binding` take
+> `regenerate-client-secret`, `set-realm-enabled(false)`, `set-realm-flow-binding` and
+> `partial-import-realm` with `OVERWRITE` take
 > effect immediately, and most cannot be undone. `delete-realm` is the one exception: it needs
 > a `confirm` argument repeating the realm name and refuses the `master` realm. A bad
 > `set-realm-flow-binding` can lock everyone out of a realm; inspect the flow first with
@@ -574,6 +599,8 @@ Claude will pick the matching tool and fill in the arguments.
 | `list-events` / `list-admin-events` return `[]` | Event storage is off for that realm. Enable it with `update-realm-events-config`. |
 | `Authorization services are not enabled on client ...` | Enable them with `update-client` (`authorizationServicesEnabled=true`); the client must be confidential (not public). |
 | `create-authorization-*` says a scope/resource/policy `not found` | They are referenced by name and must exist first. Create in order: scopes, resources, policies, then the permission. |
+| Import/export says `must be inside KEYCLOAK_FILES_DIR` or `Use an absolute path` | Paths must be absolute, end in `.json`, and (when `KEYCLOAK_FILES_DIR` is set) lie inside it. |
+| Imported clients/identity providers can't authenticate | Exports mask secrets and the import drops them. Regenerate client secrets (`regenerate-client-secret`) and set provider secrets again. |
 | `Organizations are not enabled in realm ...` | Turn the feature on with `update-realm-settings` (`organizationsEnabled=true`). |
 | `invite-organization-user` fails | The realm has no SMTP server configured; see `update-realm-smtp`. |
 | LDAP sync reports `failed` users or nothing is imported | Check `connectionUrl`, `usersDn` and the bind credentials with `get-user-federation-provider`; `list-ldap-mappers` shows how attributes are mapped. |
