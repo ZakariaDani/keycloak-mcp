@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsx --env-file=.env src/index.ts",
     "inspect": "npx @modelcontextprotocol/inspector npx tsx --env-file=.env src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tsx --test"
   },
   "dependencies": {
     "@keycloak/keycloak-admin-client": "^26.7.0",

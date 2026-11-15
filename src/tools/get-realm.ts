@@ -9,7 +9,9 @@ export function registerGetRealm(server: McpServer) {
     {
       description:
         "Get a realm's key settings: enabled status, login flags (registration, reset " +
-        "password, email verification), token/session lifespans and whether SMTP is configured.",
+        "password, email verification), security (SSL, brute force, password policy), " +
+        "token/session lifespans, locale/theme, event storage and whether SMTP is configured. " +
+        "Use get-realm-smtp for the SMTP details.",
       inputSchema: {
         realm: z.string().describe("Realm name, e.g. financement-realm")
       }
@@ -38,6 +40,18 @@ export function registerGetRealm(server: McpServer) {
         accessTokenLifespan: found.accessTokenLifespan ?? null,
         ssoSessionIdleTimeout: found.ssoSessionIdleTimeout ?? null,
         ssoSessionMaxLifespan: found.ssoSessionMaxLifespan ?? null,
+        registrationEmailAsUsername: found.registrationEmailAsUsername ?? false,
+        duplicateEmailsAllowed: found.duplicateEmailsAllowed ?? false,
+        editUsernameAllowed: found.editUsernameAllowed ?? false,
+        rememberMe: found.rememberMe ?? false,
+        bruteForceProtected: found.bruteForceProtected ?? false,
+        failureFactor: found.failureFactor ?? null,
+        passwordPolicy: found.passwordPolicy ?? null,
+        internationalizationEnabled: found.internationalizationEnabled ?? false,
+        defaultLocale: found.defaultLocale ?? null,
+        loginTheme: found.loginTheme ?? null,
+        eventsEnabled: found.eventsEnabled ?? false,
+        adminEventsEnabled: found.adminEventsEnabled ?? false,
         smtpConfigured: Boolean(found.smtpServer && Object.keys(found.smtpServer).length > 0)
       };
 
